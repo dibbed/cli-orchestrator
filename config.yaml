@@ -1,0 +1,107 @@
+# =============================================================================
+# cli-orchestrator -- single source of truth
+# =============================================================================
+# Flip which AI is the Orchestrator and which is the Worker by editing ONLY this
+# file. `cli:` must match an adapter name in adapters/__init__.py:
+#     claude_code | codex | antigravity | gemini
+#
+# ---- Verified on the build machine (2026-07, Windows 10, `<cli> --help`) ------
+#   claude_code : claude.exe        -- flags verified
+#   codex       : codex.cmd         -- flags verified (exec subcommand)
+#   antigravity : agy.exe           -- flags verified
+#   gemini      : NOT INSTALLED     -- adapter written from template, UNVERIFIED
+# -----------------------------------------------------------------------------
+
+# ------------------------------------------------------------------ ROLES ----
+# Default = "Setup A": Orchestrator = Antigravity (roomy limits for the light
+# prompt-refining role), Worker = Codex (does the heavy lifting). Claude Code is
+# a drop-in for either role (just change `cli:`).
+
+orchestrator:
+  cli: antigravity # which adapter drives AI #1
+  model:
+    null # null = use the CLI's own default model.
+    #   agy examples (run `agy models` to confirm):
+    #   "Gemini 3 Flash", "Gemini 3 Pro"
+  keep_session:
+    true # reuse one conversation across turns when the CLI
+    # exposes a resumable id (falls back to full-context
+    # re-injection when it does not)
+  cwd:
+    "." # Orchestrator runs at the repo root (NO CLAUDE.md
+    # here on purpose -> keeps its context clean)
+  # executable: ["python", "mock_cli.py"]   # optional: override the launched
+  # binary (used for the mock dry-run; see config.mock.yaml)
+  # extra_args: []            # optional: extra CLI flags appended to every call
+
+worker:
+  cli: codex # which adapter drives AI #2
+  model:
+    null # null = CLI default. codex example: "gpt-5-codex"
+    #   (placeholder -- set to a model your account accepts)
+  keep_session: true
+  cwd:
+    "./worker_dir" # Worker runs INSIDE its isolated dir so the CLI
+    # auto-reads worker_dir/{CLAUDE,AGENTS,GEMINI}.md
+  # executable: [...]
+  extra_args: ["-s", "danger-full-access", "-a", "never"]
+
+# -------------------------------------------------- SETUP B (swap the roles) --
+# To run "Setup B" (Orchestrator = Codex, Worker = Antigravity), replace the two
+# blocks above with:
+#
+#   orchestrator:
+#     cli: codex
+#     model: null
+#     keep_session: true
+#     cwd: "."
+#   worker:
+#     cli: antigravity
+#     model: null
+#     keep_session: true
+#     cwd: "./worker_dir"
+#
+# Claude Code in either role:
+#     cli: claude_code
+#     model: "sonnet"     # or "opus" / "fable" / a full model id, or null
+# -----------------------------------------------------------------------------
+
+loop:
+  max_iterations: 12 # hard safety cap on Orchestrator<->Worker turns
+  timeout_seconds: 600 # per single CLI call (kills the child on overrun)
+
+run:
+  task_file:
+    "task.txt" # used when no task is passed on the command line
+    # (`python harness.py "do X"` overrides this)
+
+# ---------------------------------------------------------------- ADAPTERS ----
+# Per-adapter, editable regex lists. `is_rate_limited` matches these
+# (case-insensitive) against stdout+stderr OR a known rate-limit exit code, and
+# STOPS + NOTIFIES the instant either agent trips one. `auth_error_patterns`
+# get a distinct "not authenticated" notification.
+adapters:
+  antigravity:
+    ratelimit_patterns: ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit"]
+    auth_error_patterns:
+      ["not logged in", "unauthenticated", "please log in", "401"]
+  codex:
+    ratelimit_patterns:
+      ["429", "quota", "insufficient_quota", "Too Many Requests", "rate limit"]
+    auth_error_patterns:
+      ["not logged in", "unauthorized", "please run .*login", "401"]
+  claude_code:
+    ratelimit_patterns: ["429", "rate limit", "overloaded", "usage limit"]
+    auth_error_patterns:
+      ["invalid api key", "authentication_error", "please run .*login", "401"]
+  gemini:
+    ratelimit_patterns: ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit"]
+    auth_error_patterns:
+      ["unauthenticated", "api key not valid", "please log in", "401"]
+
+# ----------------------------------------------------------- NOTIFICATIONS ----
+notifications:
+  toast: true # Windows toast (win11toast -> plyer -> BurntToast)
+  sound: true # winsound beep pattern
+  telegram:
+    enabled: false # reads TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID from .env

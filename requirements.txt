@@ -1,0 +1,13 @@
+# Core (required to run the harness)
+PyYAML>=6.0,<7
+python-dotenv>=1.0,<2
+
+# Windows toast notifications (optional but recommended).
+#   win11toast is the primary backend; plyer is the fallback. If neither
+#   installs cleanly, the harness falls back to a PowerShell BurntToast call,
+#   and finally to console-only -- the loop still works.
+win11toast>=0.32
+plyer>=2.1,<3
+
+# Telegram notifications use only the Python standard library (urllib) -- no
+# extra dependency required.

@@ -1,0 +1,14 @@
+# secrets
+.env
+
+# runtime logs
+logs/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# worker scratch output (keep the rules + skills, ignore generated artifacts)
+worker_dir/out/

@@ -1,0 +1,52 @@
+# =============================================================================
+# MOCK rate-limit config -- verifies the STOP-AND-NOTIFY path end to end.
+# Same as config.mock.yaml, but the Worker's mock is launched with
+# --simulate-ratelimit, so the FIRST worker call prints a 429 / rate-limit
+# error to stderr and exits non-zero.
+#
+#   python harness.py --config config.mock.ratelimit.yaml --task "anything"
+#
+# Expected: turn 1 Orchestrator delegates -> Worker trips the limit -> harness
+# logs a RATE_LIMIT event, fires notifications, and exits with code 2.
+# =============================================================================
+
+orchestrator:
+  cli: claude_code
+  model: null
+  keep_session: true
+  cwd: "."
+  executable: ["python", "mock_cli.py"]
+
+worker:
+  cli: claude_code
+  model: null
+  keep_session: true
+  cwd: "."
+  executable: ["python", "mock_cli.py", "--simulate-ratelimit"]   # <- trips the limit
+
+loop:
+  max_iterations: 12
+  timeout_seconds: 120
+
+run:
+  task_file: "task.txt"
+
+adapters:
+  claude_code:
+    ratelimit_patterns: ["429", "rate limit", "overloaded", "usage limit"]
+    auth_error_patterns: ["invalid api key", "authentication_error", "401"]
+  antigravity:
+    ratelimit_patterns: ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit"]
+    auth_error_patterns: ["not logged in", "401"]
+  codex:
+    ratelimit_patterns: ["429", "quota", "insufficient_quota", "Too Many Requests"]
+    auth_error_patterns: ["not logged in", "401"]
+  gemini:
+    ratelimit_patterns: ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit"]
+    auth_error_patterns: ["unauthenticated", "401"]
+
+notifications:
+  toast: true
+  sound: true
+  telegram:
+    enabled: false

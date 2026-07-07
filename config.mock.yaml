@@ -1,0 +1,51 @@
+# =============================================================================
+# MOCK dry-run config -- exercises the whole loop WITHOUT spending real quota.
+# Both roles are pointed at mock_cli.py via an `executable` override. The
+# claude_code adapter is used so the mock's JSON envelope + session-id parsing
+# are exercised too.
+#
+#   python harness.py --config config.mock.yaml --task "Summarize the CSV"
+#
+# Expected: delegate -> delegate -> finalize (mock finalizes on turn 3).
+# =============================================================================
+
+orchestrator:
+  cli: claude_code
+  model: null
+  keep_session: true
+  cwd: "."
+  executable: ["python", "mock_cli.py"]   # <- run the fake CLI instead of `claude`
+
+worker:
+  cli: claude_code
+  model: null
+  keep_session: true
+  cwd: "."                                # mock_cli.py lives at the repo root
+  executable: ["python", "mock_cli.py"]
+
+loop:
+  max_iterations: 12
+  timeout_seconds: 120
+
+run:
+  task_file: "task.txt"
+
+adapters:
+  claude_code:
+    ratelimit_patterns: ["429", "rate limit", "overloaded", "usage limit"]
+    auth_error_patterns: ["invalid api key", "authentication_error", "401"]
+  antigravity:
+    ratelimit_patterns: ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit"]
+    auth_error_patterns: ["not logged in", "401"]
+  codex:
+    ratelimit_patterns: ["429", "quota", "insufficient_quota", "Too Many Requests"]
+    auth_error_patterns: ["not logged in", "401"]
+  gemini:
+    ratelimit_patterns: ["429", "RESOURCE_EXHAUSTED", "quota", "rate limit"]
+    auth_error_patterns: ["unauthenticated", "401"]
+
+notifications:
+  toast: true
+  sound: true
+  telegram:
+    enabled: false
